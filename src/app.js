@@ -14,11 +14,9 @@ function sendResponse(res, status, data, message = null) {
     status,
     data,
   };
-
   if (message) {
     response.message = message;
   }
-
   res.json(response);
 }
 
@@ -35,7 +33,9 @@ const taskStatus = {
 
 app.post("/todo", (req, res) => {
   const newTodo = req.body;
-  newTodo.status = newTodo.status.toUpperCase() || taskStatus.OPEN;
+  newTodo.status = !newTodo.status
+    ? taskStatus.OPEN
+    : newTodo.status.toUpperCase();
   if (!Object.values(taskStatus).includes(newTodo.status)) {
     sendResponse(res, "fail", null, "No data found.");
   }
@@ -84,14 +84,14 @@ app.put("/todo/:id", (req, res) => {
       ? updateTodo.status.toUpperCase()
       : toDoData.todo[index].status;
     if (!Object.values(taskStatus).includes(toDoData.todo[index].status)) {
-      return res.status(400).json({ error: "error message" });
+      return res.status(400).json({ error: "Invalid status" });
     }
 
     addDataToFile();
     res
       .send({
         status: "success",
-        data: toDoData,
+        data: toDoData.todo[index],
       })
       .status(200);
   } else {
@@ -109,7 +109,12 @@ app.delete("/todo/:id", (req, res) => {
   if (index !== -1) {
     toDoData.todo.splice(index, 1);
     addDataToFile();
-    res.status(200).send("Data Deleted");
+    res
+      .send({
+        status: "success",
+        data: toDoData,
+      })
+      .send("Data Deleted");
   } else {
     res.status(404).send("Data not found");
   }
@@ -118,15 +123,20 @@ app.delete("/todo/:id", (req, res) => {
 app.delete("/todo", (req, res) => {
   toDoData.todo = [];
   addDataToFile();
-  res.status(200).send("Data Deleted");
+  res
+    .send({
+      status: "success",
+      data: toDoData,
+    })
+    .send("Data Deleted");
 });
 
 //<------------------------Delete------------------------>//
 
 //<------------------------Cron Job------------------------>//
-//here scheduller is set for a minute to check the status of the task and delete the task if it is completed.
+//this cron job is used to delete the task which is completed at 12:00 AM
 
-cron.schedule("* * * * *", () => {
+cron.schedule("0 0 * * *", () => {
   console.log("Running Cron Job");
   for (let i = toDoData.todo.length - 1; i > -1; i--) {
     if (toDoData.todo[i].status === taskStatus.COMPLETE) {
